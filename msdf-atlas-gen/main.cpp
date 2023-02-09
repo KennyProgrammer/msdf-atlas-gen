@@ -1,8 +1,9 @@
 
 /*
-* MULTI-CHANNEL SIGNED DISTANCE FIELD ATLAS GENERATOR - standalone console program
-* --------------------------------------------------------------------------------
-* A utility by Viktor Chlumsky, (c) 2020 - 2023
+* MULTI-CHANNEL SIGNED DISTANCE FIELD ATLAS GENERATOR v1.2 (2021-05-29) - standalone console program
+* --------------------------------------------------------------------------------------------------
+* A utility by Viktor Chlumsky, (c) 2020 - 2021
+*
 */
 
 #ifdef MSDF_ATLAS_STANDALONE
@@ -28,16 +29,6 @@ using namespace msdf_atlas;
 #define LCG_MULTIPLIER 6364136223846793005ull
 #define LCG_INCREMENT 1442695040888963407ull
 
-#define STRINGIZE_(x) #x
-#define STRINGIZE(x) STRINGIZE_(x)
-#define MSDF_ATLAS_VERSION_STRING STRINGIZE(MSDF_ATLAS_VERSION)
-#define MSDFGEN_VERSION_STRING STRINGIZE(MSDFGEN_VERSION)
-#ifdef MSDF_ATLAS_VERSION_UNDERLINE
-    #define VERSION_UNDERLINE STRINGIZE(MSDF_ATLAS_VERSION_UNDERLINE)
-#else
-    #define VERSION_UNDERLINE "--------"
-#endif
-
 #ifdef MSDFGEN_USE_SKIA
     #define TITLE_SUFFIX    " & Skia"
     #define EXTRA_UNDERLINE "-------"
@@ -46,20 +37,13 @@ using namespace msdf_atlas;
     #define EXTRA_UNDERLINE
 #endif
 
-static const char * const versionText =
-    "MSDF-Atlas-Gen v" MSDF_ATLAS_VERSION_STRING "\n"
-    "  with MSDFgen v" MSDFGEN_VERSION_STRING TITLE_SUFFIX "\n"
-    "(c) 2020 - " STRINGIZE(MSDF_ATLAS_COPYRIGHT_YEAR) " Viktor Chlumsky";
-
 static const char * const helpText = R"(
-MSDF Atlas Generator by Viktor Chlumsky v)" MSDF_ATLAS_VERSION_STRING R"( (with MSDFgen v)" MSDFGEN_VERSION_STRING TITLE_SUFFIX R"()
-----------------------------------------------------------------)" VERSION_UNDERLINE EXTRA_UNDERLINE R"(
+MSDF Atlas Generator by Viktor Chlumsky v)" MSDF_ATLAS_VERSION R"( (with MSDFGEN v)" MSDFGEN_VERSION TITLE_SUFFIX R"()
+----------------------------------------------------------------)" EXTRA_UNDERLINE R"(
 
 INPUT SPECIFICATION
   -font <filename.ttf/otf>
-      Specifies the input TrueType / OpenType font file. A font specification is required.
-  -varfont <filename.ttf/otf?var0=value0&var1=value1>
-      Specifies an input variable font file and configures its variables.
+      Specifies the input TrueType / OpenType font file. This is required.
   -charset <filename>
       Specifies the input character set. Refer to the documentation for format of charset specification. Defaults to ASCII.
   -glyphset <filename>
@@ -90,13 +74,9 @@ OUTPUT SPECIFICATION - one or more can be specified
   -json <filename.json>
       Writes the atlas's layout data, as well as other metrics into a structured JSON file.
   -csv <filename.csv>
-      Writes the layout data of the glyphs into a simple CSV file.)"
-#ifndef MSDF_ATLAS_NO_ARTERY_FONT
-R"(
+      Writes the layout data of the glyphs into a simple CSV file.
   -arfont <filename.arfont>
-      Stores the atlas and its layout data as an Artery Font file. Supported formats: png, bin, binfloat.)"
-#endif
-R"(
+      Stores the atlas and its layout data as an Artery Font file. Supported formats: png, bin, binfloat.
   -shadronpreview <filename.shadron> <sample text>
       Generates a Shadron script that uses the generated atlas to draw a sample text as a preview.
 
@@ -207,32 +187,8 @@ static bool cmpExtension(const char *path, const char *ext) {
     return true;
 }
 
-static msdfgen::FontHandle * loadVarFont(msdfgen::FreetypeHandle *library, const char *filename) {
-    std::string buffer;
-    while (*filename && *filename != '?')
-        buffer.push_back(*filename++);
-    msdfgen::FontHandle *font = msdfgen::loadFont(library, buffer.c_str());
-    if (font && *filename++ == '?') {
-        do {
-            buffer.clear();
-            while (*filename && *filename != '=')
-                buffer.push_back(*filename++);
-            if (*filename == '=') {
-                double value = 0;
-                int skip = 0;
-                if (sscanf(++filename, "%lf%n", &value, &skip) == 1) {
-                    msdfgen::setFontVariationAxis(library, font, buffer.c_str(), value);
-                    filename += skip;
-                }
-            }
-        } while (*filename++ == '&');
-    }
-    return font;
-}
-
 struct FontInput {
     const char *fontFilename;
-    bool variableFont;
     GlyphIdentifierType glyphIdentifierType;
     const char *charsetFilename;
     double fontScale;
@@ -282,7 +238,6 @@ static bool makeAtlas(const std::vector<GlyphGeometry> &glyphs, const std::vecto
         }
     }
 
-#ifndef MSDF_ATLAS_NO_ARTERY_FONT
     if (config.arteryFontFilename) {
         ArteryFontExportProperties arfontProps;
         arfontProps.fontSize = config.emSize;
@@ -297,7 +252,6 @@ static bool makeAtlas(const std::vector<GlyphGeometry> &glyphs, const std::vecto
             puts("Failed to generate Artery Font file.");
         }
     }
-#endif
 
     return success;
 }
@@ -348,10 +302,6 @@ int main(int argc, const char * const *argv) {
         const char *arg = argv[argPos];
         #define ARG_CASE(s, p) if (!strcmp(arg, s) && argPos+(p) < argc)
 
-        // Accept arguments prefixed with -- instead of -
-        if (arg[0] == '-' && arg[1] == '-')
-            ++arg;
-
         ARG_CASE("-type", 1) {
             arg = argv[++argPos];
             if (!strcmp(arg, "hardmask"))
@@ -397,13 +347,6 @@ int main(int argc, const char * const *argv) {
         }
         ARG_CASE("-font", 1) {
             fontInput.fontFilename = argv[++argPos];
-            fontInput.variableFont = false;
-            ++argPos;
-            continue;
-        }
-        ARG_CASE("-varfont", 1) {
-            fontInput.fontFilename = argv[++argPos];
-            fontInput.variableFont = true;
             ++argPos;
             continue;
         }
@@ -442,13 +385,11 @@ int main(int argc, const char * const *argv) {
             ++argPos;
             continue;
         }
-    #ifndef MSDF_ATLAS_NO_ARTERY_FONT
         ARG_CASE("-arfont", 1) {
             config.arteryFontFilename = argv[++argPos];
             ++argPos;
             continue;
         }
-    #endif
         ARG_CASE("-imageout", 1) {
             config.imageFilename = argv[++argPos];
             ++argPos;
@@ -683,15 +624,11 @@ int main(int argc, const char * const *argv) {
             argPos += 2;
             continue;
         }
-        ARG_CASE("-version", 0) {
-            puts(versionText);
-            return 0;
-        }
         ARG_CASE("-help", 0) {
             puts(helpText);
             return 0;
         }
-        printf("Unknown setting or insufficient parameters: %s\n", argv[argPos]);
+        printf("Unknown setting or insufficient parameters: %s\n", arg);
         suggestHelp = true;
         ++argPos;
     }
@@ -743,9 +680,9 @@ int main(int argc, const char * const *argv) {
         puts("Neither atlas size nor glyph size selected, using default...");
         minEmSize = MSDF_ATLAS_DEFAULT_EM_SIZE;
     }
-    if (config.imageType == ImageType::HARD_MASK || config.imageType == ImageType::SOFT_MASK) {
+    if (!(config.imageType == ImageType::SDF || config.imageType == ImageType::PSDF || config.imageType == ImageType::MSDF || config.imageType == ImageType::MTSDF)) {
         rangeMode = RANGE_PIXEL;
-        rangeValue = 1;
+        rangeValue = (double) (config.imageType == ImageType::SOFT_MASK);
     } else if (rangeValue <= 0) {
         rangeMode = RANGE_PIXEL;
         rangeValue = DEFAULT_PIXEL_RANGE;
@@ -786,7 +723,6 @@ int main(int argc, const char * const *argv) {
     }
     if (config.imageType == ImageType::MTSDF && config.imageFormat == ImageFormat::BMP)
         ABORT("Atlas type not compatible with image format. MTSDF requires a format with alpha channel.");
-#ifndef MSDF_ATLAS_NO_ARTERY_FONT
     if (config.arteryFontFilename && !(config.imageFormat == ImageFormat::PNG || config.imageFormat == ImageFormat::BINARY || config.imageFormat == ImageFormat::BINARY_FLOAT)) {
         config.arteryFontFilename = nullptr;
         result = 1;
@@ -796,7 +732,6 @@ int main(int argc, const char * const *argv) {
             return result;
         layoutOnly = !(config.arteryFontFilename || config.imageFilename);
     }
-#endif
     if (imageExtension != ImageFormat::UNSPECIFIED) {
         // Warn if image format mismatches -imageout extension
         bool mismatch = false;
@@ -839,13 +774,13 @@ int main(int argc, const char * const *argv) {
                     msdfgen::deinitializeFreetype(ft);
                 }
             }
-            bool load(const char *fontFilename, bool isVarFont) {
+            bool load(const char *fontFilename) {
                 if (ft && fontFilename) {
                     if (this->fontFilename && !strcmp(this->fontFilename, fontFilename))
                         return true;
                     if (font)
                         msdfgen::destroyFont(font);
-                    if ((font = isVarFont ? loadVarFont(ft, fontFilename) : msdfgen::loadFont(ft, fontFilename))) {
+                    if ((font = msdfgen::loadFont(ft, fontFilename))) {
                         this->fontFilename = fontFilename;
                         return true;
                     }
@@ -859,7 +794,7 @@ int main(int argc, const char * const *argv) {
         } font;
 
         for (FontInput &fontInput : fontInputs) {
-            if (!font.load(fontInput.fontFilename, fontInput.variableFont))
+            if (!font.load(fontInput.fontFilename))
                 ABORT("Failed to load specified font file.");
             if (fontInput.fontScale <= 0)
                 fontInput.fontScale = 1;
