@@ -23,3 +23,17 @@
 output.png
 out/
 /cmake-gen.bat
+
+# Visual Studio clutter
+_ReSharper*
+*.dir
+*.vcxproj*
+*.sln
+CMakeSettings.json
+Win32
+x64
+Debug
+Release
+MinSizeRel
+RelWithDebInfo
+*.opensdf
