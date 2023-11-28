@@ -16,8 +16,8 @@ project "MsdfAtlasGen"
 	language      "C++"
 	cppdialect    "C++17"
 	staticruntime "on"
-	targetdir     ("%{ForceDir.BinLib}/" .. BuildDir .. "/%{prj.name}/lib")
-	objdir        ("%{ForceDir.BinLib}/" .. BuildDir .. "/%{prj.name}/obj")
+	targetdir     ("%{ForceDir.BinLib}/" .. BuildDir .. "/%{prj.name}/Lib")
+	objdir        ("%{ForceDir.BinLib}/" .. BuildDir .. "/%{prj.name}/Obj")
 
 	files {
 		"msdf-atlas-gen/**.h",
@@ -27,19 +27,26 @@ project "MsdfAtlasGen"
 
 	includedirs {
 		"msdf-atlas-gen",
-		"msdfgen",
 		"msdfgen/include"
 	}
 
-	links   = {}
-	defines = {}
+	local DefinesList = {}
+	local LinksList   = {}
 
-	if LinkLibrary["MsdfGen"] then
-		table.insert(links,   "MsdfGen")
-		table.insert(defines, "FE_LIBRARY_MSDFGEN")
+	if Libraries["MsdfGen"] then
+		table.insert(LinksList,   "MsdfGen")
+		table.insert(DefinesList, "FE_LIBRARY_MSDFGEN")
 	end
 
-	table.insert(defines, "_CRT_SECURE_NO_WARNINGS")
+	table.insert(DefinesList, "_CRT_SECURE_NO_WARNINGS")
+
+	defines {
+		DefinesList
+	}
+
+	links {
+		LinksList
+	}
 
 	filter "system:windows"
 		systemversion "latest"
